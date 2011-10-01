@@ -1,0 +1,3 @@
+name = Multi-Factor Authentication
+description = Enable Multi-Factor authentication via VoIP.
+core = 6.x

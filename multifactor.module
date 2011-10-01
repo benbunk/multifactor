@@ -1,0 +1,186 @@
+<?php
+/**
+ * @file Implementation of drupal core hooks.
+ */
+
+/**
+ * Constants
+ */
+define('MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED',
+  variable_get('multifactor_role_authenticated_user_disabled', TRUE));
+define('MULTIFACTOR_BRICK_ON_ERROR', variable_get('multifactor_brick_on_error', FALSE));
+define('MULTIFACTOR_ROLE_USER_1_FAILOVER', variable_get('multifactor_role_user_1_failover', TRUE));
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function multifactor_form_alter(&$form, $form_state, $form_id) {
+  switch ($form_id) {
+    case 'user_login':
+    case 'user_login_block':
+        $form['#validate'][] = 'multifactor_user_login_validate';
+      break;
+  }
+}
+
+/**
+ * Implementation of form validate. This functions does more than just validating, but it's main
+ * Intention is to break the login form flow.
+ *
+ * @param $form_item
+ *   The status of the name field in the form field after being submitted by the user.
+ *
+ */
+function multifactor_user_login_validate($form, &$form_state) {
+  //love u
+  // Do not ever move the above line...Ben
+
+  // @todo Check which method the user prefers
+  /*
+   * switch(profile->multifactor_method) {
+   *   case 'text': validate_text($form_state); break;
+   *   case 'voip': // Fall through...
+   *   default: validate_voip($form_state); break;
+   * }
+   */
+
+  // Load user name from the form field - name.
+  $name = $form_state['values']['name'];
+
+// @todo Move loading the user and profile into a separate helper function.
+//////////////////////////////////// LOAD USER
+  // Is the user blocked
+  // Fail silenty if the user is blocked.
+  if(user_is_blocked($name)) {
+    return;
+  }
+
+  // Load the user.
+  $user = user_load(array('name' => $name));
+  // Fail silenty if the user doesn't exist.
+  if(empty($user->uid) || !is_numeric($user->uid)) {
+    return;
+  }
+
+  // If the user only has the authenticated role and MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED is set to TRUE
+  // don't require multifactor authentication.
+  if((MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED)
+     && (count($user->roles) === 1)
+     && ($user->roles[0] === 'authenticated user')) {
+    watchdog('multifactor', 'Multifactor: multifactor_role_authenticated_user_disabled is set to TRUE. User has only
+            one role and it is the default authenticated user role');
+    return;
+  }
+
+  // @todo Load profile fields and make sure a pin is setup otherwise don't use multifactor.
+  // Load Profile Data
+  profile_load_profile($user);
+
+  // @todo move getting a pin number to a support function in case the field changes or needs to be configurable.
+  // Brick the login process if there is no pin
+  // @todo we might need to make this brick feature a bit more complex by only applying it to roles that require multifactor.
+  if(MULTIFACTOR_BRICK_ON_ERROR
+     && (!isset($user->profile_multifactor_pin) || !numeric($user->profile_multifactor_pin))) {
+    form_set_error('name', 'User doesn\'t have a pin in their profile.');
+    return;
+  }
+
+//////////////////////////////////// END LOAD USER
+
+
+//////////////////////////////////// LOAD ROLES TO CHECK
+  // Check if the user has any roles that have multi-factor enabled.
+  $multifactor_roles_to_check = variable_get('multifactor_roles_to_check', array('authenticated user',
+                                                                                'admin',
+                                                                                'administrator'));
+  if (!is_array($multifactor_roles_to_check)) {
+    watchdog('multifactor', 'Multifactor: multifactor_roles_to_check must be an array. Check to make sure this
+            variable isn\'t modified by strongarm, devel, or in a settings file, to something other then an array.
+            The array is valid even if it has only one element and follows the array syntax.');
+    // @todo if brick on errors fail here.
+    return;
+  }
+
+  // 3-way merge between checked roles, possible roles, and users actual roles.
+  $valid_roles = array_intersect($multifactor_roles_to_check,
+                                 user_roles(TRUE), // Exclude anonymous from list of all possible roles.
+                                 $user->roles // Actual user roles...no thanks to the above misnomer.
+  );
+
+  // If MULTIFACTOR_BRICK_ON_ERROR is set to TRUE then lock out the user because they could present a potential brute
+  // force vector. You might also want to use this in conjunction with MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED
+  // set to false which would mean all users will need to have multifactor authentication to login.
+  if(MULTIFACTOR_BRICK_ON_ERROR && count($valid_roles) === 0) {
+    form_set_error('name', 'User doesn\'t have roles included in multifactor authentication policies and has been
+                   blocked from login.');
+    return;
+  }
+//////////////////////////////////// END LOAD ROLES TO CHECK
+
+
+//////////////////////////////////// MAKE VOIP CALL
+
+  // Setup the initial call.
+  $call = new VoipCall();
+
+  // Get the correct script and verify it is available.
+  // @todo $call->setScript('');
+
+  // @todo Get the number from the profile.
+  // @todo Check number is valid as a pre-req.
+  $call->setDestNumber('2404765171');
+  // @todo Verify this isn't needed.
+  $call->setDestName('Ben');
+
+  // The return from calling voip_dial will always be true as long as it contacts the service even if the service fails
+  // So After calling this we need to check the call status and verify the pin in the result. Only then is it successful.
+  $ret = voip_dial($call);
+  // @todo Check call status.
+  // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
+  while($call->status !== $call->isHangup()) {
+    // @todo Check for input.
+      // @todo Accept or recurse.
+
+    // @todo adjust this based on the php timeout.
+    sleep(1000);
+  }
+
+  // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
+  if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
+    /**
+     * @todo Implement User1 failover
+     * Call a backup admin and require a valid pin.
+     * If the second_admin_pin is correct
+     *   reset user 1's pin to a random 4 digit number and provide it to the second_admin
+     * If the second_admin_pin is incorrect
+     *  block user1 and make no further calls on the users behalf.
+     */
+  }
+//////////////////////////////////// END MAKE VOIP CALL
+}
+
+/**
+ * Call the user
+ */
+
+/**
+ * Setup the call
+ */
+
+/**
+ * Get profile data for the user.
+ */
+
+/**
+ * Hook into the profile fields to setup a pin number.
+ */
+//user_profile_form($form_state, $account, $category = 'account')
+
+/**
+ * Handle the profile form submit values to save the profile pin number
+ */
+//user_profile_form_submit($form, &$form_state)
+
+/**
+ * Provide a report that shows roles that won't be covered by multifactor.
+ */
