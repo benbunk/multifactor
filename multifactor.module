@@ -33,7 +33,6 @@ function multifactor_form_alter(&$form, $form_state, $form_id) {
  */
 function multifactor_user_login_validate($form, &$form_state) {
   //love u
-  // Do not ever move the above line...Ben
 
   // @todo Check which method the user prefers
   /*
@@ -72,12 +71,12 @@ function multifactor_user_login_validate($form, &$form_state) {
     return;
   }
 
-  // @todo Load profile fields and make sure a pin is setup otherwise don't use multifactor.
+  // @todo Load profile fields and check pre reqs required for multifactor authentication exits. (text = enabled || pin exists, etc.)
   // Load Profile Data
   profile_load_profile($user);
 
   // @todo move getting a pin number to a support function in case the field changes or needs to be configurable.
-  // Brick the login process if there is no pin
+  // Brick the login process if failback isn't enabled or no pre-reqs exist. 
   // @todo we might need to make this brick feature a bit more complex by only applying it to roles that require multifactor.
   if(MULTIFACTOR_BRICK_ON_ERROR
      && (!isset($user->profile_multifactor_pin) || !numeric($user->profile_multifactor_pin))) {
@@ -137,14 +136,19 @@ function multifactor_user_login_validate($form, &$form_state) {
   $ret = voip_dial($call);
   // @todo Check call status.
   // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
-  while($call->status !== $call->isHangup()) {
+  while(!$call->isHangup()) {
+    sleep(1000);
+
+
+
     // @todo Check for input.
       // @todo Accept or recurse.
 
     // @todo adjust this based on the php timeout.
-    sleep(1000);
+    break;
   }
-
+  voip_hangup($call);
+  
   // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
   if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
     /**
