@@ -137,7 +137,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   // @todo Check call status.
   // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
   while(!$call->isHangup()) {
-    sleep(1000);
+    sleep(20);
 
 
 
