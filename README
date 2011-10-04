@@ -1,0 +1,9 @@
+This is a module to support adding multifactor authentication to Drupal.
+
+It's currently designed to either call and verify a known PIN or to text and provide a random PIN that is entered into
+Drupal during the login process.
+
+This project needs to be split into three parts:
+1. Core hooks to support other modules implementing multifactor authentication.
+2. Text based multifactor authentication module implementing the core hooks.
+3. Voice based multifactor authentication module implementing the core hooks.
