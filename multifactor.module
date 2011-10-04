@@ -84,6 +84,12 @@ function multifactor_user_login_validate($form, &$form_state) {
     return;
   }
 
+  // Make sure a phone number exists.
+  if(MULTIFACTOR_BRICK_ON_ERROR
+     && (!isset($user->profile_multifactor_number) || !numeric($user->profile_multifactor_number))) {
+    form_set_error('name', 'User doesn\'t have a phone number in their profile.');
+    return;
+  }
 //////////////////////////////////// END LOAD USER
 
 
@@ -127,7 +133,7 @@ function multifactor_user_login_validate($form, &$form_state) {
 
   // @todo Get the number from the profile.
   // @todo Check number is valid as a pre-req.
-  $call->setDestNumber('2404765171');
+  $call->setDestNumber($user->profile_multifactor_number);
   // @todo Verify this isn't needed.
   $call->setDestName('Ben');
 
@@ -137,10 +143,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   // @todo Check call status.
   // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
   while(!$call->isHangup()) {
-    sleep(20);
-
-
-
+    sleep(10);
     // @todo Check for input.
       // @todo Accept or recurse.
 
