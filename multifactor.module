@@ -140,7 +140,17 @@ function multifactor_user_login_validate($form, &$form_state) {
   // The return from calling voip_dial will always be true as long as it contacts the service even if the service fails
   // So After calling this we need to check the call status and verify the pin in the result. Only then is it successful.
   $ret = voip_dial($call);
-  // @todo Check call error.
+  if (!$ret) {
+    watchdog('multifactor',
+      'Error queuing the call. Make sure the VOIP Drupal settings are correct and the VOIP Script exists and can be loaded.');
+    if(MULTIFACTOR_BRICK_ON_ERROR) {
+      form_set_error('name', 'Multifactor Failure.');
+      return;
+    }
+    else {
+      return TRUE;
+    }
+  }
 
   // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
   while(!$call->isHangup()) {
