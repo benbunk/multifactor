@@ -129,7 +129,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   $call = new VoipCall();
 
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  $script = VoipScript::loadScript('multifactor_get_pin');
+  $script = VoipScript::loadScript('multifactor_get_pin', array('1234' => '1234'));
   $call->setScript($script);
 
   // @todo Check number is valid as a pre-req.
@@ -209,10 +209,24 @@ function multifactor_voipscript_get_script_names() {
 }
 
 function multifactor_voipscript_load_script($script_name, $params = NULL) {
+
+  watchdog('multifactor', 'Params: ' . var_export($params, TRUE));
+
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
-    $script->addSay('Hello Have a Great Day');
-    $script->addHangup();
+    $prompt = 'Welcome to Multifactor Authentication.';
+    $input_options = array (
+      $params[0] => $params[0],   // The users pin number is the array element...haha ingenious.
+      '#' => 'option_hash',
+      't' => 'no_input_received', // used to report timeout situations
+      'i' => 'invalid_option'
+    );
+    $invalid_msg = 'I\'m sorry I didn\'t recognize your input, please try again.';
+    $no_input_msg = 'Please input your pass code';
+    $max_attempts = '4';
+    $timeout = '5';
+    $script->addRunIvrMenu($prompt, $input_options, $invalid_msg, $no_input_msg, $max_attempts, $timeout);
+
     return $script;
   }
 }
