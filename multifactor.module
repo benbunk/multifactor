@@ -128,7 +128,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   // Setup the initial call.
   $call = new VoipCall();
 
-  // Get the correct script and verify it is available.
+  // Get the correct script by it's node title and verify it is available - Requires scriptui.
   // @todo $call->setScript('');
 
   // @todo Get the number from the profile.
@@ -140,7 +140,8 @@ function multifactor_user_login_validate($form, &$form_state) {
   // The return from calling voip_dial will always be true as long as it contacts the service even if the service fails
   // So After calling this we need to check the call status and verify the pin in the result. Only then is it successful.
   $ret = voip_dial($call);
-  // @todo Check call status.
+  // @todo Check call error.
+
   // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
   while(!$call->isHangup()) {
     sleep(10);
