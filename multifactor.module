@@ -146,8 +146,8 @@ function multifactor_user_login_validate($form, &$form_state) {
   while(!$call->isHangup()) {
     sleep(10);
     // @todo Check for input.
+    watchdog('multifactor', var_dump($call->getCallData()));
       // @todo Accept or recurse.
-
     // @todo adjust this based on the php timeout.
     break;
   }
@@ -192,3 +192,16 @@ function multifactor_user_login_validate($form, &$form_state) {
 /**
  * Provide a report that shows roles that won't be covered by multifactor.
  */
+
+
+function multifactor_voipscript_get_script_names() {
+  return array('multifactor_get_pin',);
+}
+
+function multifactor_voipscript_load_script($script_name, $params = NULL) {
+  $script = new VoipScript('voipscript_small_office_ivr');
+  $script->addSay('Temp');
+  $script->addGetInput('Please enter your PIN.');
+  $script->addHangup();
+  return $script;
+}
