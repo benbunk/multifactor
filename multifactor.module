@@ -129,7 +129,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   $call = new VoipCall();
 
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  $call->setScript('multifactor_get_pin');
+  //$call->setScript('multifactor_get_pin');
 
   // @todo Get the number from the profile.
   // @todo Check number is valid as a pre-req.
@@ -151,12 +151,15 @@ function multifactor_user_login_validate($form, &$form_state) {
       return TRUE;
     }
   }
+  else {
+    watchdog('multifactor', 'voip_dial returned TRUE.');
+  }
 
   // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
   while(!$call->isHangup()) {
     sleep(10);
     // @todo Check for input.
-    watchdog('multifactor', var_dump($call->getCallData()));
+    watchdog('multifactor', 'Dumping Call Data: ' . var_dump($call->getCallData()));
       // @todo Accept or recurse.
     // @todo adjust this based on the php timeout.
     break;
