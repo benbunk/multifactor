@@ -129,7 +129,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   $call = new VoipCall();
 
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  $call->setScript('Multifactor VOIP');
+  $call->setScript('multifactor_get_pin');
 
   // @todo Get the number from the profile.
   // @todo Check number is valid as a pre-req.
@@ -199,7 +199,7 @@ function multifactor_voipscript_get_script_names() {
 }
 
 function multifactor_voipscript_load_script($script_name, $params = NULL) {
-  $script = new VoipScript('voipscript_small_office_ivr');
+  $script = new VoipScript('multifactor_get_pin');
   $script->addSay('Temp');
   $script->addGetInput('Please enter your PIN.');
   $script->addHangup();
