@@ -129,7 +129,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   $call = new VoipCall();
 
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  //$call->setScript('multifactor_get_pin');
+  $call->setScript('multifactor_get_pin');
 
   // @todo Get the number from the profile.
   // @todo Check number is valid as a pre-req.
@@ -164,7 +164,8 @@ function multifactor_user_login_validate($form, &$form_state) {
     // @todo adjust this based on the php timeout.
     break;
   }
-  voip_hangup($call);
+  // Clean up if the multifactor auth was successful.
+  if (!$call->isHangup()) { voip_hangup($call); }
   
   // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
   if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
@@ -212,9 +213,11 @@ function multifactor_voipscript_get_script_names() {
 }
 
 function multifactor_voipscript_load_script($script_name, $params = NULL) {
-  $script = new VoipScript('multifactor_get_pin');
-  $script->addSay('Temp');
-  $script->addGetInput('Please enter your PIN.');
-  $script->addHangup();
-  return $script;
+  if ($script_name === 'multifactor_get_ping') {
+    $script = new VoipScript('multifactor_get_pin');
+    $script->addSay('Temp');
+    $script->addGetInput('Please enter your PIN.');
+    $script->addHangup();
+    return $script;
+  }
 }
