@@ -131,7 +131,6 @@ function multifactor_user_login_validate($form, &$form_state) {
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
   $call->setScript('multifactor_get_pin');
 
-  // @todo Get the number from the profile.
   // @todo Check number is valid as a pre-req.
   $call->setDestNumber($user->profile_multifactor_number);
   // @todo Verify this isn't needed.
@@ -151,22 +150,12 @@ function multifactor_user_login_validate($form, &$form_state) {
       return TRUE;
     }
   }
-  else {
-    watchdog('multifactor', 'voip_dial returned TRUE.');
+
+  // @todo None of this might be necessary! Check call->setVar and prompt call backs. See VOIP Drupal docs for details.
+  // Wait until call is done.
+  while(!$call->isHangup()) {
   }
 
-  // @todo block continuing here until the call is complete ... verify the php timeout settings and make sure we aren't sleeping longer then the timeout.
-  while(!$call->isHangup()) {
-    sleep(10);
-    // @todo Check for input.
-    watchdog('multifactor', 'Dumping Call Data: ' . var_dump($call->getCallData()));
-      // @todo Accept or recurse.
-    // @todo adjust this based on the php timeout.
-    break;
-  }
-  // Clean up if the multifactor auth was successful.
-  if (!$call->isHangup()) { voip_hangup($call); }
-  
   // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
   if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
     /**
@@ -216,8 +205,6 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
   if ($script_name === 'multifactor_get_ping') {
     $script = new VoipScript('multifactor_get_pin');
     $script->addSay('Temp');
-    $script->addGetInput('Please enter your PIN.');
-    $script->addHangup();
     return $script;
   }
 }
