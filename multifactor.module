@@ -219,12 +219,12 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
 
     $prompt = 'Welcome to Multifactor Authentication.';
 
-    $script->addLabel('pin_menu');
+    $script->addLabel('pin menu');
     $input_options = array (
-      $params[0] => 'success',    // The users pin number is the array element...haha ingenious.
-      '*' => 'hang up',
-      't' => 'no_input_received', // used to report timeout situations
-      'i' => 'invalid_option'
+      $params[0] => 'success',  // The users pin number is the array element...haha ingenious. @todo verify this is secure.
+      '*' => 'hang up',         // Random hang up character
+      't' => 'hang up',         // used to report timeout situations
+      'i' => 'pin menu'         // Invalid option
     );
 
     $invalid_msg = 'I\'m sorry I didn\'t recognize your input, please try again. Hahahahaha';
