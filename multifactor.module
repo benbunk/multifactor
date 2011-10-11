@@ -214,19 +214,33 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
 
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
+
+    $script->addSay('Welcome to Multifactor Authentication.');
+
     $prompt = 'Welcome to Multifactor Authentication.';
+
+    $script->addLabel('pin_menu');
     $input_options = array (
-      $params[0] => $params[0],   // The users pin number is the array element...haha ingenious.
-      '#' => 'option_hash',
+      $params[0] => 'success',    // The users pin number is the array element...haha ingenious.
+      '*' => 'hang up',
       't' => 'no_input_received', // used to report timeout situations
       'i' => 'invalid_option'
     );
-    $invalid_msg = 'I\'m sorry I didn\'t recognize your input, please try again.';
+
+    $invalid_msg = 'I\'m sorry I didn\'t recognize your input, please try again. Hahahahaha';
     $no_input_msg = 'Please input your pass code';
     $max_attempts = '4';
     $timeout = '5';
     $script->addRunIvrMenu($prompt, $input_options, $invalid_msg, $no_input_msg, $max_attempts, $timeout);
 
+    $script->addLabel('success');
+    $script->addSay('Success, thank you.');
+    $script->addGoto('hang up');
+
+    $script->addLabel('hang up');
+    $script->addSay(t('Thanks so much for calling. Bye bye.'));
+    $script->addHangup();
+    
     return $script;
   }
 }
