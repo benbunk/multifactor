@@ -210,7 +210,7 @@ function multifactor_voipscript_get_script_names() {
 
 function multifactor_voipscript_load_script($script_name, $params = NULL) {
 
-  watchdog('multifactor', 'Params: ' . var_export($params[0]));
+  watchdog('multifactor', 'Params: ' . var_export($params[0], TRUE));
 
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
