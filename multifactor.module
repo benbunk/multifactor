@@ -129,7 +129,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   $call = new VoipCall();
 
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  $script = VoipScript::loadScript('multifactor_get_pin', array('1234' => '1234'));
+  $script = VoipScript::loadScript('multifactor_get_pin', array('1234'));
   $call->setScript($script);
 
   // @todo Check number is valid as a pre-req.
@@ -210,34 +210,28 @@ function multifactor_voipscript_get_script_names() {
 
 function multifactor_voipscript_load_script($script_name, $params = NULL) {
 
-  watchdog('multifactor', 'Params: ' . var_export($params, TRUE));
+  watchdog('multifactor', 'Params: ' . var_export($params[0]));
 
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
 
     $script->addSay('Welcome to Multifactor Authentication.');
 
+    $script->addLabel('pin_menu');
     $prompt = 'Welcome to Multifactor Authentication.';
-
-    $script->addLabel('pin menu');
-
     $input_options = array (
       $params[0] => 'success',  // The users pin number is the array element...haha ingenious. @todo verify this is secure.
       '*' => 'hang up',         // Random hang up character
       't' => 'hang up',         // used to report timeout situations
-      'i' => 'pin menu'         // Invalid option
+      'i' => 'pin_menu'         // Invalid option
     );
-
     $invalid_msg = 'I\'m sorry I didn\'t recognize your input, please try again. Hahahahaha';
-    $no_input_msg = 'Please input your pass code';
-    $max_attempts = '4';
-    $timeout = '60';
-    $script->addRunIvrMenu($prompt, $input_options, $invalid_msg, $no_input_msg, $max_attempts, $timeout);
+    $script->addRunIvrMenu($prompt, $input_options, $invalid_msg);
     $script->addGoto('%ivr_option_selected');
 
     $script->addLabel('success');
     $script->addSay('Success, thank you.');
-    $script->addGoto('hang up');
+    $script->addHangup();
 
     $script->addLabel('hang up');
     $script->addSay(t('Thanks so much for calling. Bye bye.'));
