@@ -220,6 +220,7 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     $prompt = 'Welcome to Multifactor Authentication.';
 
     $script->addLabel('pin menu');
+
     $input_options = array (
       $params[0] => 'success',  // The users pin number is the array element...haha ingenious. @todo verify this is secure.
       '*' => 'hang up',         // Random hang up character
@@ -232,6 +233,7 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     $max_attempts = '4';
     $timeout = '5';
     $script->addRunIvrMenu($prompt, $input_options, $invalid_msg, $no_input_msg, $max_attempts, $timeout);
+    $script->addGoto('%ivr_option_selected');
 
     $script->addLabel('success');
     $script->addSay('Success, thank you.');
