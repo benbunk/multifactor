@@ -215,23 +215,20 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
 
-    $script->addSay(t('Welcome to our office hot line. '));
-
-    $script->addLabel('office_menu');
     $options_menu = t('For sales, dial 1. For customer support, dial 2. For hours of operation, dial 3. To hang up, dial the star key. ');
     $input_options = array(
       '1' => 'sales',
-      '*' => 'hang up',
-      'i' => 'hang up',
-      't' => 'hang up'
     );
     $invalid_msg = t('Invalid option selected.');
     $script->addRunIvrMenu($options_menu, $input_options, $invalid_msg);
-    $script->addGoto('%ivr_option_selected');
+    // Backend is calling runIvrMenu now.
+    $script->addGoto('%ivr_option_selected'); // Internal to voipscript.inc
+    
+    $script->addSay(t('Welcome to our office hot line. '));
 
     $script->addLabel('sales');
     $script->addSay('Sales department');
-    $script->addGoto('hang up');
+    $script->addGoto('play_menu_options'); // Internal to voipscript.inc
 
     $script->addLabel('hang up');
     $script->addHangup();
