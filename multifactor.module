@@ -210,26 +210,31 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
 
+    // Welcome script.
     $script->addLabel('welcome');
     $script->addSay('Welcome to Multi Factor Authentication.');
     $script->addGoto('get_pin');
 
+    // Get pin script.
     $script->addLabel('get_pin');
     $prompt = 'Please input your four digit pin number followed by the pound key.';
     $script->addGetInput($prompt, 4, '#', 10);
     $script->addSet('pin', '%input_digits');
+    // Check to make sure the input is somewhat valid.
     $script->addGotoIf('invalid_pin', "^%pin == ''");
-    $script->addGoto('validate_pin');
-
-    $script->addLabel('validate_pin');
+    // Validate the pin for real.
     $script->addSet('success', '^_multifactor_validate_pin(%pin)');
-    $script->addGotoIf('invalid_pin', '^success === FALSE');
-    $script->addGoto('success_message');
+    // Check for success because if we check for failure the success goto might accidentally get called.
+    $script->addGotoIf('success_message', '^success === TRUE');
+    // Fail to failure notification if this isn't the correct pin.
+    $script->addGoto('invalid_pin');
 
+    // Invalid pin messages.
     $script->addLabel('invalid_pin');
     $script->addSay('Invalid Pin number please try again.');
     $script->addGoto('get_pin');
 
+    // Correct pin given message.
     $script->addLabel('success_message');
     $script->addSay('Thank you. I will log you in now.');
     $script->addHangup();
@@ -246,9 +251,11 @@ function _multifactor_validate_pin($pin = NULL) {
     return FALSE;
   }
   
-  if ($pin === '1234') {
-    watchdog('multifactor', 'Pin matches.');
+  if ($pin !== '1234') {
+    watchdog('multifactor', 'Invalid Pin.');
+    return FALSE;
   }
-  
+
+  watchdog('multifactor', 'Pin matches.');
   return TRUE;
 }
