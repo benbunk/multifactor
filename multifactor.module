@@ -210,26 +210,36 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
 
-    $script->addSay('Welcome to Multifactor Authentication.');
+    $script->addSay(t('Welcome to our office hot line. '));
 
-    $script->addLabel('pin_menu');
-    $prompt = 'Welcome to Multifactor Authentication.';
-    $input_options = array (
-      $params[0] => 'success',  // The users pin number is the array element...haha ingenious. @todo verify this is secure.
-      '*' => 'hang up',         // Random hang up character
-      't' => 'hang up',         // used to report timeout situations
-      'i' => 'pin_menu'         // Invalid option
+    $script->addLabel('office_menu');
+    $options_menu = t('For sales, dial 1. For customer support, dial 2. For hours of operation, dial 3. To hang up, dial the star key. ');
+    $input_options = array(
+      '1' => 'sales',
+      '2' => 'customer support',
+      '3' => 'hours',
+      '*' => 'hang up',
+      'i' => 'hang up',
+      't' => 'hang up'
     );
-    $invalid_msg = 'I\'m sorry I didn\'t recognize your input, please try again. Hahahahaha';
-    $script->addRunIvrMenu($prompt, $input_options, $invalid_msg, 3, 100);
+    $invalid_msg = t('Invalid option selected.');
+    $script->addRunIvrMenu($options_menu, $input_options, $invalid_msg);
     $script->addGoto('%ivr_option_selected');
 
-    $script->addLabel('success');
-    $script->addSay('Success, thank you.');
-    $script->addHangup();
+    $script->addLabel('sales');
+    $script->addSay('Sales department');
+    $script->addGoto('hang up');
+
+    $script->addLabel('customer support');
+    $script->addSay(t('Customer support department'));
+    $script->addGoto('hang up');
+
+    $script->addLabel('hours');
+    $script->addSay(t('Our office is open Monday to Friday from 9am to 5pm.'));
+    $script->addGoto('office_menu');
 
     $script->addLabel('hang up');
-    $script->addSay(t('Thanks so much for calling. Bye bye.'));
+    $script->addSay(t('Thanks so much for calling our office. Bye bye.'));
     $script->addHangup();
     
     return $script;
