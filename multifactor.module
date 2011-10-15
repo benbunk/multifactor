@@ -246,21 +246,12 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
 // @todo this is probably not thread safe. We will need to pass something to the script to make sure it calls this
 // with enough information to check the correct pin number. UID makes sense I think for D6 and D7. 
 function _multifactor_validate_pin($pin = NULL) {
-  watchdog('multifactor', var_export($pin));
-
   if (is_null($pin)) {
     watchdog('multifactor', 'Pin number is null.');
     return FALSE;
   }
 
-  if (is_string($pin)) {
-    watchdog('multifactor', 'Pin is string.');
-    $pin = trim($pin);
-  }
-  
-  if (is_numeric($pin)) { watchdog('multifactor', 'Pin is numeric.'); }
-
-  if ($pin != '1234') {
+  if ($pin != 1234) {
     watchdog('multifactor', 'Invalid Pin. Input: @pin', array('@pin' => $pin), WATCHDOG_NOTICE);
     return FALSE;
   }
