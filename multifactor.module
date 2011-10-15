@@ -225,7 +225,8 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     // Validate the pin for real.
     $script->addSet('success', '^_multifactor_validate_pin(%pin)');
     // Check for success because if we check for failure the success goto might accidentally get called.
-    $script->addGotoIf('success_message', '^%success === TRUE');
+    $script->addSay('The success var is set to: %success');
+    $script->addGotoIf('success_message', '^%success == TRUE');
     // Fail to failure notification if this isn't the correct pin.
     $script->addGoto('invalid_pin');
 
