@@ -249,10 +249,6 @@ function _multifactor_validate_pin($pin = NULL) {
   if ($pin === '1234') {
     watchdog('multifactor', 'Pin matches.');
   }
-  else {
-    watchdog('multifactor', 'Pin doesn\'t match.');
-    return FALSE;
-  }
   
   return TRUE;
 }
