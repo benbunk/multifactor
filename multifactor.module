@@ -157,11 +157,6 @@ function multifactor_user_login_validate($form, &$form_state) {
 
   // @todo None of this might be necessary! Check call->setVar and prompt call backs. See VOIP Drupal docs for details.
   // Wait until call is done.
-  while(!$call->isHangup()) {
-    watchdog('multifactor', 'Inside while'); 
-   break;
-  }
-  watchdog('multifactor', 'Outside while');
 
   // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
   if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
@@ -218,6 +213,7 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     $options_menu = t('For sales, dial 1. For customer support, dial 2. For hours of operation, dial 3. To hang up, dial the star key. ');
     $input_options = array(
       '1' => 'sales',
+      $params[0] => 'valid',
     );
     $invalid_msg = t('Invalid option selected.');
     $script->addRunIvrMenu($options_menu, $input_options, $invalid_msg);
@@ -229,6 +225,10 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     $script->addLabel('sales');
     $script->addSay('Sales department');
     $script->addGoto('play_menu_options'); // Internal to voipscript.inc
+
+    $script->addLabel('valid');
+    $script->addSay('This is a correct entry and will be considered valid.');
+    $script->addGoto('hang up');
 
     $script->addLabel('hang up');
     $script->addHangup();
