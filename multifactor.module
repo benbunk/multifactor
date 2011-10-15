@@ -210,38 +210,45 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
 
-    $script->addSay(t('Welcome to our office hot line. '));
+    $script->addLabel('welcome');
+    $script->addSay('Welcome to Multi Factor Authentication.');
+    $script->addGoto('get_pin');
 
-    $script->addLabel('office_menu');
-    $options_menu = t('For sales, dial 1. For customer support, dial 2. For hours of operation, dial 3. To hang up, dial the star key. ');
-    $input_options = array(
-      '1' => 'sales',
-      '2' => 'customer support',
-      '3' => 'hours',
-      '*' => 'hang up',
-      'i' => 'hang up',
-      't' => 'hang up'
-    );
-    $invalid_msg = t('Invalid option selected.');
-    $script->addRunIvrMenu($options_menu, $input_options, $invalid_msg);
-    $script->addGoto('%ivr_option_selected');
+    $script->addLabel('get_pin');
+    $prompt = 'Please input your four digit pin number followed by the pound key.';
+    $script->addGetInput($prompt, 4, '#', 10);
+    $script->addSet('pin', '%input_digits');
+    $script->addGotoIf('invalid_pin', "^%input_digits == ''");
+    $script->addGoto('validate_pin');
 
-    $script->addLabel('sales');
-    $script->addSay('Sales department');
-    $script->addGoto('hang up');
+    $script->addLabel('validate_pin');
+    $script->addSet('success', '^_multifactor_validate_pin(%pin)');
+    $script->addGotoIf('invalid_pin', '^success === FALSE');
+    $script->addGoto('success_message');
 
-    $script->addLabel('customer support');
-    $script->addSay(t('Customer support department'));
-    $script->addGoto('hang up');
+    $script->addLabel('invalid_pin');
+    $script->addSay('Invalid Pin number please try again.');
+    $script->addGoto('get_pin');
 
-    $script->addLabel('hours');
-    $script->addSay(t('Our office is open Monday to Friday from 9am to 5pm.'));
-    $script->addGoto('office_menu');
-
-    $script->addLabel('hang up');
-    $script->addSay(t('Thanks so much for calling our office. Bye bye.'));
+    $script->addLabel('success_message');
+    $script->addSay('Thank you. I will log you in now.');
     $script->addHangup();
     
     return $script;
   }
+}
+
+// @todo this is probably not thread safe. We will need to pass something to the script to make sure it calls this
+// with enough information to check the correct pin number. UID makes sense I think for D6 and D7. 
+function _multifactor_validate_pin($pin = NULL) {
+  if (is_null($pin)) {
+    watchdog('multifactor', 'Pin number is null.');
+    return FALSE;
+  }
+  
+  if ($pin === '1234') {
+    watchdog('multifactor', 'Pin matches.');
+  }
+  
+  return TRUE;
 }
