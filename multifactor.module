@@ -251,7 +251,7 @@ function _multifactor_validate_pin($pin = NULL) {
     return FALSE;
   }
   
-  if ($pin !== '1234') {
+  if ($pin !== 1234 || $pin !== '1234') {
     watchdog('multifactor', 'Invalid Pin. Input: @pin', array('@pin' => $pin), WATCHDOG_NOTICE);
     return FALSE;
   }
