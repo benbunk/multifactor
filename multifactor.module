@@ -218,7 +218,7 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     $prompt = 'Please input your four digit pin number followed by the pound key.';
     $script->addGetInput($prompt, 4, '#', 10);
     $script->addSet('pin', '%input_digits');
-    $script->addGotoIf('invalid_pin', "^%input_digits == ''");
+    $script->addGotoIf('invalid_pin', "^%pin == ''");
     $script->addGoto('validate_pin');
 
     $script->addLabel('validate_pin');
@@ -248,6 +248,10 @@ function _multifactor_validate_pin($pin = NULL) {
   
   if ($pin === '1234') {
     watchdog('multifactor', 'Pin matches.');
+  }
+  else {
+    watchdog('multifactor', 'Pin doesn\'t match.');
+    return FALSE;
   }
   
   return TRUE;
