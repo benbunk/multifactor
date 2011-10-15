@@ -220,13 +220,17 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     $prompt = 'Please input your four digit pin number followed by the pound key.';
     $script->addGetInput($prompt, 4, '#', 10);
     $script->addSet('pin', '%input_digits');
+
     // Check to make sure the input is somewhat valid.
     $script->addGotoIf('invalid_pin', "^%input_digits == ''");
+    // Check if the pin matches the users pin
+    $script->addGotoIf('success_message', '^%input_digits === ' . (int)$params[0]);
+
     // Validate the pin for real.
-    $script->addSet('success', '^_multifactor_validate_pin(%pin)');
+    //$script->addSet('success', '^_multifactor_validate_pin(%pin)');
     // Check for success because if we check for failure the success goto might accidentally get called.
-    $script->addSay('The success var is set to: %success');
-    $script->addGotoIf('success_message', '^%success == TRUE');
+    //$script->addGotoIf('success_message', '^%success == TRUE');
+    
     // Fail to failure notification if this isn't the correct pin.
     $script->addGoto('invalid_pin');
 
