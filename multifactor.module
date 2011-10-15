@@ -221,11 +221,11 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     $script->addGetInput($prompt, 4, '#', 10);
     $script->addSet('pin', '%input_digits');
     // Check to make sure the input is somewhat valid.
-    $script->addGotoIf('invalid_pin', "^%pin == ''");
+    $script->addGotoIf('invalid_pin', "^%input_digits == ''");
     // Validate the pin for real.
     $script->addSet('success', '^_multifactor_validate_pin(%pin)');
     // Check for success because if we check for failure the success goto might accidentally get called.
-    $script->addGotoIf('success_message', '^success === TRUE');
+    $script->addGotoIf('success_message', '^%success === TRUE');
     // Fail to failure notification if this isn't the correct pin.
     $script->addGoto('invalid_pin');
 
@@ -252,7 +252,7 @@ function _multifactor_validate_pin($pin = NULL) {
   }
   
   if ($pin !== '1234') {
-    watchdog('multifactor', 'Invalid Pin.');
+    watchdog('multifactor', 'Invalid Pin. Input: @pin', array('@pin' => $pin), WATCHDOG_NOTICE);
     return FALSE;
   }
 
