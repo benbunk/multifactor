@@ -154,6 +154,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   if (!$ret) {
     watchdog('multifactor',
       'Error queuing the call. Make sure the VOIP Drupal settings are correct and the VOIP Script exists and can be loaded.');
+    /*
     if(MULTIFACTOR_BRICK_ON_ERROR) {
       form_set_error('name', 'Multifactor Failure.');
       return;
@@ -161,9 +162,7 @@ function multifactor_user_login_validate($form, &$form_state) {
     else {
       return TRUE;
     }
-  }
-  else {
-    watchdog('multifactor', 'Call successfull.');
+    */
   }
 
   // Check for when the call is done so we can continue.
@@ -215,7 +214,7 @@ function multifactor_user_login_validate($form, &$form_state) {
        */
     }
 
-    form_set_error('name', 'Multifactor Failure. Result: ' . var_dump($nonce));
+    form_set_error('name', 'Multifactor Failure.');
     return FALSE;
   }
 
