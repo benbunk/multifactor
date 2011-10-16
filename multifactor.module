@@ -129,7 +129,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   $call = new VoipCall();
 
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  $script = VoipScript::loadScript('multifactor_get_pin', array('1234', '1'));
+  $script = VoipScript::loadScript('multifactor_get_pin', array($user->profile_multifactor_pin, $user->uid));
   $call->setScript($script);
 
   // @todo Check number is valid as a pre-req.
