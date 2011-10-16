@@ -309,6 +309,10 @@ function _multifactor_validate_pin($pin = NULL) {
  */
 function _multifactor_finalize($uid) {
   // Insert into a table to create the nonce
-  db_query("INSERT INTO {multifactor_nonce} VALUES (%s, %s, %s)", array($uid, time(), 'multifactor_pin'));
+  db_query("
+    INSERT INTO {multifactor_nonce}
+      ('uid', 'timestamp', 'module')
+    VALUES
+      (%d, %d, %s)", array($uid, time(), 'multifactor_pin'));
   return;
 }
