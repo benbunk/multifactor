@@ -125,6 +125,8 @@ function multifactor_user_login_validate($form, &$form_state) {
 
 //////////////////////////////////// MAKE VOIP CALL
 
+  $start_time = time();
+
   // Setup the initial call.
   $call = new VoipCall();
 
@@ -158,6 +160,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   while(!$call->isHangup()) {
     sleep(1); // Sleep one second and try again.
   }
+  $end_time = time();
 
   // Once it's been hung up we check for a nonce/semaphore...FML
   $result = db_query("SELECT uid, timestamp, module FROM {multifactor_nonce} WHERE module = '%s' AND uid = '%s'", array('multifactor_pin', '1'));
@@ -166,7 +169,8 @@ function multifactor_user_login_validate($form, &$form_state) {
   //@todo add an age threshold here.
   // Currently hardcoded to 1 minute
   // Check if the nonce is more recent then the past 1 minute
-  if($nonce->timestamp >= microtime() - 60000000) {
+
+  if($nonce->timestamp >= $end_time - ($start_time - $end_time)) {
     return TRUE;
   }
   else {
@@ -305,6 +309,6 @@ function _multifactor_validate_pin($pin = NULL) {
  */
 function _multifactor_finalize($uid) {
   // Insert into a table to create the nonce
-  db_query("INSERT INTO {multifactor_nonce} VALUES (%s, %s, %s)", array($uid, microtime(), 'multifactor_pin'));
+  db_query("INSERT INTO {multifactor_nonce} VALUES (%s, %s, %s)", array($uid, time(), 'multifactor_pin'));
   return;
 }
