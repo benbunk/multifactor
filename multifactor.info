@@ -1,3 +1,5 @@
 name = Multi-Factor Authentication
-description = Enable Multi-Factor authentication via VoIP.
+description = Enable Multi-Factor authentication with libraries such as VoIP Drupal.
 core = 6.x
+
+dependencies[] = voipdrupal
