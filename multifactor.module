@@ -1,6 +1,10 @@
 <?php
 /**
  * @file Implementation of drupal core hooks.
+ *
+ * @todo the entire file needs cleaning.
+ * @todo This needs to be hookified so that new multifactor modules can leverage the framework laid out here.
+ * 
  */
 
 function multifactor_cron() {
