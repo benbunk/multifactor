@@ -181,7 +181,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   // Currently hardcoded to 1 minute
   // Check if the nonce is more recent then the past 1 minute
 
-  if($nonce->timestamp >= $end_time - ($start_time - $end_time)) {
+  if($nonce->timestamp >= $start_time) {
     return TRUE;
   }
   else {
@@ -197,7 +197,7 @@ function multifactor_user_login_validate($form, &$form_state) {
        */
     }
 
-    form_set_error('name', 'Multifactor Failure.');
+    form_set_error('name', 'Multifactor Failure. Result: ' . var_dump($nonce));
     return;
   }
 
