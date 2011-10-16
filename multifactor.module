@@ -159,7 +159,9 @@ function multifactor_user_login_validate($form, &$form_state) {
 
   while(!$call->isHangup()) {
     sleep(1); // Sleep one second and try again.
+    watchdog('multifactor', 'Sleeping');
   }
+  watchdog('multifactor', 'Call hung up.');
   $end_time = time();
 
   // Once it's been hung up we check for a nonce/semaphore...FML
