@@ -164,9 +164,9 @@ function multifactor_user_login_validate($form, &$form_state) {
 
   while(!$call->isHangup()) {
     sleep(1); // Sleep one second and try again.
-    watchdog('multifactor', 'Sleeping');
-    if ($start_time - time() > 120) {
-      watchdog('multifactor', 'Reached maximum execution time.');
+    watchdog('multifactor', 'Sleeping: ' . $start_time - time());
+    if (time() - $start_time > 120) {
+      watchdog('multifactor', 'Reached maximum execution time. Status: ' . var_export($call->getCallStatus(), TRUE));
       break;
     }
   }
