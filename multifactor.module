@@ -167,7 +167,7 @@ function multifactor_user_login_validate($form, &$form_state) {
     watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
 
     // Reload the call from the DB to make sure isHangup is accurate...
-    $call->load($call->getCid());
+    $call = VoipCall::load($call->getCid());
 
     // Check Maximum execution time.
     // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relavancy checks.
