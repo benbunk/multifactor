@@ -311,8 +311,8 @@ function _multifactor_finalize($uid) {
   // Insert into a table to create the nonce
   db_query("
     INSERT INTO {multifactor_nonce}
-      ('uid', 'timestamp', 'module')
+      (uid, timestamp, module)
     VALUES
-      (%d, %d, %s)", array($uid, time(), 'multifactor_pin'));
+      (%d, %d, '%s')", array($uid, time(), 'multifactor_pin'));
   return;
 }
