@@ -3,6 +3,11 @@
  * @file Implementation of drupal core hooks.
  */
 
+function multifactor_cron() {
+  watchdog('multifactor', 'Deleting stale nonces.');
+  db_query("DELETE FROM {multifactor_nonce} WHERE timestamp > %d", array(time() - 120));
+}
+
 /**
  * Constants
  */
@@ -160,6 +165,10 @@ function multifactor_user_login_validate($form, &$form_state) {
   while(!$call->isHangup()) {
     sleep(1); // Sleep one second and try again.
     watchdog('multifactor', 'Sleeping');
+    if ($start_time - time() > 120) {
+      watchdog('multifactor', 'Reached maximum execution time.');
+      break;
+    }
   }
   watchdog('multifactor', 'Call hung up.');
   $end_time = time();
