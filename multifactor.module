@@ -163,8 +163,14 @@ function multifactor_user_login_validate($form, &$form_state) {
   }
 
   while(!$call->isHangup()) {
-    sleep(1); // Sleep one second and try again.
+    sleep(10); // Sleep one second and try again.
     watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
+
+    // Reload the call from the DB to make sure isHangup is accurate...
+    $call->load($call->getCid());
+
+    // Check Maximum execution time.
+    // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relavancy checks.
     if (time() - $start_time > 60) {
       watchdog('multifactor', 'Reached maximum execution time. Status: ' . var_export($call->getCallStatus(), TRUE));
       break;
