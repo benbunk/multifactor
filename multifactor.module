@@ -162,9 +162,10 @@ function multifactor_user_login_validate($form, &$form_state) {
     watchdog('multifactor', 'Call successfull.');
   }
 
+  // Check for when the call is done so we can continue.
   while(!$call->isHangup()) {
-    sleep(10); // Sleep one second and try again.
-    watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
+    sleep(5); // Sleep one second and try again.
+    //watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
 
     // Reload the call from the DB to make sure isHangup is accurate...
     $call = VoipCall::load($call->getCid());
@@ -176,17 +177,18 @@ function multifactor_user_login_validate($form, &$form_state) {
       break;
     }
   }
-  watchdog('multifactor', 'Call hung up.');
-  $end_time = time();
+  //$end_time = time();
 
   // Once it's been hung up we check for a nonce/semaphore...FML
-  $result = db_query("SELECT uid, timestamp, module FROM {multifactor_nonce} WHERE module = '%s' AND uid = '%s'", array('multifactor_pin', '1'));
+  $result = db_query("
+    SELECT nonce_id, uid, timestamp, module
+    FROM {multifactor_nonce}
+    WHERE module = '%s' AND uid = '%s'",
+    array('multifactor_pin', '1'));
   $nonce = db_fetch_object($result);
 
-  //@todo add an age threshold here.
-  // Currently hardcoded to 1 minute
-  // Check if the nonce is more recent then the past 1 minute
-
+  // Check if the nonce is more recent then the request itself.
+  // @todo check if the nonce is younger then the maximum age.
   if($nonce->timestamp >= $start_time) {
     return TRUE;
   }
@@ -207,6 +209,11 @@ function multifactor_user_login_validate($form, &$form_state) {
     return;
   }
 
+  // Clean up the nonce.
+  db_query("
+    DELETE FROM {multifactor_nonce}
+    WHERE nonce_id = %d",
+    array($nonce->nonce_id));
 
 //////////////////////////////////// END MAKE VOIP CALL
 }
