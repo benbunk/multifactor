@@ -1,0 +1,42 @@
+<?php
+
+function multifactor_schema () {
+  $schema['multifactor_nonce'] = array(
+    'description' => t('A table to organize single use nonces for multifactor authentication.'),
+    'fields' => array(
+      'nonce_id' => array(
+        'description' => t('Unique id for deleting nonces.'),
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => t('The user id associated with this nonce.'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'timestamp' => array(
+        'description' => t('The timestamp used in determining stale, in/valid nonces. '),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'module' => array(
+        'description' => t('The module that created this nonce.'),
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('nonce_id'),
+    'unique keys' => array(
+      'user, module' => array('uid', 'module')
+    ),
+    'indexes' => array(
+      'uid, module' => array('uid', 'module'),
+    ),
+  );
+
+  return $schema;
+}

@@ -129,7 +129,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   $call = new VoipCall();
 
   // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  $script = VoipScript::loadScript('multifactor_get_pin', array('1234'));
+  $script = VoipScript::loadScript('multifactor_get_pin', array('1234', '1'));
   $call->setScript($script);
 
   // @todo Check number is valid as a pre-req.
@@ -152,23 +152,41 @@ function multifactor_user_login_validate($form, &$form_state) {
     }
   }
   else {
-    watchdog('multifactor', 'Call successful.');
+    watchdog('multifactor', 'Call successfull.');
   }
 
-  // @todo None of this might be necessary! Check call->setVar and prompt call backs. See VOIP Drupal docs for details.
-  // Wait until call is done.
-
-  // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
-  if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
-    /**
-     * @todo Implement User1 failover
-     * Call a backup admin and require a valid pin.
-     * If the second_admin_pin is correct
-     *   reset user 1's pin to a random 4 digit number and provide it to the second_admin
-     * If the second_admin_pin is incorrect
-     *  block user1 and make no further calls on the users behalf.
-     */
+  while(!$call->isHangup()) {
+    sleep(1); // Sleep one second and try again.
   }
+
+  // Once it's been hung up we check for a nonce/semaphore...FML
+  $result = db_query("SELECT uid, timestamp, module FROM {multifactor_nonce} WHERE module = '%s' AND uid = '%s'", array('multifactor_pin', '1'));
+  $nonce = db_fetch_object($result);
+
+  //@todo add an age threshold here.
+  // Currently hardcoded to 1 minute
+  // Check if the nonce is more recent then the past 1 minute
+  if($nonce->timestamp >= microtime() - 60000000) {
+    return TRUE;
+  }
+  else {
+    // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
+    if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
+      /**
+       * @todo Implement User1 failover
+       * Call a backup admin and require a valid pin.
+       * If the second_admin_pin is correct
+       *   reset user 1's pin to a random 4 digit number and provide it to the second_admin
+       * If the second_admin_pin is incorrect
+       *  block user1 and make no further calls on the users behalf.
+       */
+    }
+
+    form_set_error('name', 'Multifactor Failure.');
+    return;
+  }
+
+
 //////////////////////////////////// END MAKE VOIP CALL
 }
 
@@ -205,10 +223,15 @@ function multifactor_voipscript_get_script_names() {
 
 function multifactor_voipscript_load_script($script_name, $params = NULL) {
 
-  watchdog('multifactor', 'Params: ' . var_export($params[0], TRUE));
+  if(!is_array($params)) {
+    watchdog('multifactor', 'Invalid Params array passed to multifactor_voipscript_load_script');
+  }
 
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
+
+    // Setup basics
+    $script->addSet('uid', $params[1]);
 
     // Welcome script.
     $script->addLabel('welcome');
@@ -242,12 +265,21 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     // Correct pin given message.
     $script->addLabel('success_message');
     $script->addSay('Thank you. I will log you in now.');
+    $script->addSet('nonce', '^_multifactor_finalize(%uid)');
     $script->addHangup();
     
     return $script;
   }
 }
 
+/**
+ *
+ * Deprecated: This isn't thread safe so I removed it from use. It might be needed later so it's still here.
+ *
+ * @param null $pin
+ * @return bool
+ *
+ */
 // @todo this is probably not thread safe. We will need to pass something to the script to make sure it calls this
 // with enough information to check the correct pin number. UID makes sense I think for D6 and D7. 
 function _multifactor_validate_pin($pin = NULL) {
@@ -263,4 +295,16 @@ function _multifactor_validate_pin($pin = NULL) {
 
   watchdog('multifactor', 'Pin matches.');
   return TRUE;
+}
+
+/**
+ * Create a nonce/semaphore (not sure the correct term) for the authentication process.
+ * 
+ * @param $uid
+ * @return
+ */
+function _multifactor_finalize($uid) {
+  // Insert into a table to create the nonce
+  db_query("INSERT INTO {multifactor_nonce} VALUES (%s, %s, %s)", array($uid, microtime(), 'multifactor_pin'));
+  return;
 }
