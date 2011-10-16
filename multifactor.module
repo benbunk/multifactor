@@ -216,7 +216,7 @@ function multifactor_user_login_validate($form, &$form_state) {
     }
 
     form_set_error('name', 'Multifactor Failure. Result: ' . var_dump($nonce));
-    return;
+    return FALSE;
   }
 
   
