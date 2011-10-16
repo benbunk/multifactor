@@ -183,13 +183,19 @@ function multifactor_user_login_validate($form, &$form_state) {
   }
   //$end_time = time();
 
-  // Once it's been hung up we check for a nonce/semaphore...FML
+  // Once it's been hung up we check for a nonce/semaphore.
   $result = db_query("
     SELECT nonce_id, uid, timestamp, module
     FROM {multifactor_nonce}
     WHERE module = '%s' AND uid = '%d'",
     array('multifactor_pin', $user->uid));
-  $nonce = db_fetch_object($result); 
+  $nonce = db_fetch_object($result);
+
+  // Clean up the nonce immediately.
+  db_query("
+    DELETE FROM {multifactor_nonce}
+    WHERE nonce_id = %d",
+    array($nonce->nonce_id));
 
   // Check if the nonce is more recent then the request itself.
   // @todo check if the nonce is younger then the maximum age.
@@ -213,11 +219,7 @@ function multifactor_user_login_validate($form, &$form_state) {
     return;
   }
 
-  // Clean up the nonce.
-  db_query("
-    DELETE FROM {multifactor_nonce}
-    WHERE nonce_id = %d",
-    array($nonce->nonce_id));
+  
 
 //////////////////////////////////// END MAKE VOIP CALL
 }
