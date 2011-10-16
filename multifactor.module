@@ -5,7 +5,7 @@
 
 function multifactor_cron() {
   watchdog('multifactor', 'Deleting stale nonces.');
-  db_query("DELETE FROM {multifactor_nonce} WHERE timestamp > %d", array(time() - 120));
+  db_query("DELETE FROM {multifactor_nonce} WHERE timestamp < %d", array(time() - 120));
 }
 
 /**
