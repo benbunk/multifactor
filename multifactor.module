@@ -187,8 +187,8 @@ function multifactor_user_login_validate($form, &$form_state) {
   $result = db_query("
     SELECT nonce_id, uid, timestamp, module
     FROM {multifactor_nonce}
-    WHERE module = '%s' AND uid = '%s'",
-    array('multifactor_pin', '1'));
+    WHERE module = '%s' AND uid = '%d'",
+    array('multifactor_pin', $user->uid));
   $nonce = db_fetch_object($result); 
 
   // Check if the nonce is more recent then the request itself.
