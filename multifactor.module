@@ -125,6 +125,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   // force vector. You might also want to use this in conjunction with MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED
   // set to false which would mean all users will need to have multifactor authentication to login.
   if(MULTIFACTOR_BRICK_ON_ERROR && count($valid_roles) === 0) {
+    sess_destroy_uid($user->uid);
     form_set_error('name', 'User doesn\'t have roles included in multifactor authentication policies and has been
                    blocked from login.');
     return;
@@ -163,6 +164,7 @@ function multifactor_user_login_validate($form, &$form_state) {
       return TRUE;
     }
     */
+    sess_destroy_uid($user->uid);
   }
 
   // Check for when the call is done so we can continue.
@@ -177,6 +179,7 @@ function multifactor_user_login_validate($form, &$form_state) {
     // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relavancy checks.
     if (time() - $start_time > 60) {
       watchdog('multifactor', 'Reached maximum execution time. Status: ' . var_export($call->getCallStatus(), TRUE));
+      sess_destroy_uid($user->uid);
       break;
     }
   }
@@ -213,8 +216,8 @@ function multifactor_user_login_validate($form, &$form_state) {
        *  block user1 and make no further calls on the users behalf.
        */
     }
-
-    form_set_error('name', 'Multifactor Failure.', TRUE);
+    sess_destroy_uid($user->uid);
+    form_set_error('void', 'Multifactor Failure.', TRUE);
     return;
   }
 
