@@ -199,7 +199,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   // Check if the nonce is more recent then the request itself.
   // @todo check if the nonce is younger then the maximum age.
   if($nonce->timestamp >= $start_time) {
-    return TRUE;
+    return;
   }
   else {
     // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
@@ -214,8 +214,8 @@ function multifactor_user_login_validate($form, &$form_state) {
        */
     }
 
-    form_set_error('name', 'Multifactor Failure.');
-    return FALSE;
+    form_set_error('name', 'Multifactor Failure.', TRUE);
+    return;
   }
 
   
