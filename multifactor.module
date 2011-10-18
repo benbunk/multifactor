@@ -27,7 +27,8 @@ function multifactor_form_alter(&$form, $form_state, $form_id) {
   switch ($form_id) {
     case 'user_login':
     case 'user_login_block':
-        $form['#validate'][] = 'multifactor_user_login_validate';
+        // @todo Ugg address multiple login based modules from fighting here...modules like login_security etc.
+        $form['#validate'] = array_merge(array('multifactor_user_login_validate'), $form['#validate']);
       break;
   }
 }
@@ -89,14 +90,14 @@ function multifactor_user_login_validate($form, &$form_state) {
   // @todo we might need to make this brick feature a bit more complex by only applying it to roles that require multifactor.
   if(MULTIFACTOR_BRICK_ON_ERROR
      && (!isset($user->profile_multifactor_pin) || !numeric($user->profile_multifactor_pin))) {
-    form_set_error('name', 'User doesn\'t have a pin in their profile.');
+    form_set_error('void', 'User doesn\'t have a pin in their profile.');
     return;
   }
 
   // Make sure a phone number exists.
   if(MULTIFACTOR_BRICK_ON_ERROR
      && (!isset($user->profile_multifactor_number) || !numeric($user->profile_multifactor_number))) {
-    form_set_error('name', 'User doesn\'t have a phone number in their profile.');
+    form_set_error('void', 'User doesn\'t have a phone number in their profile.');
     return;
   }
 //////////////////////////////////// END LOAD USER
@@ -125,8 +126,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   // force vector. You might also want to use this in conjunction with MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED
   // set to false which would mean all users will need to have multifactor authentication to login.
   if(MULTIFACTOR_BRICK_ON_ERROR && count($valid_roles) === 0) {
-    sess_destroy_uid($user->uid);
-    form_set_error('name', 'User doesn\'t have roles included in multifactor authentication policies and has been
+    form_set_error('void', 'User doesn\'t have roles included in multifactor authentication policies and has been
                    blocked from login.');
     return;
   }
@@ -164,7 +164,6 @@ function multifactor_user_login_validate($form, &$form_state) {
       return TRUE;
     }
     */
-    sess_destroy_uid($user->uid);
   }
 
   // Check for when the call is done so we can continue.
@@ -179,7 +178,6 @@ function multifactor_user_login_validate($form, &$form_state) {
     // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relavancy checks.
     if (time() - $start_time > 60) {
       watchdog('multifactor', 'Reached maximum execution time. Status: ' . var_export($call->getCallStatus(), TRUE));
-      sess_destroy_uid($user->uid);
       break;
     }
   }
@@ -199,6 +197,8 @@ function multifactor_user_login_validate($form, &$form_state) {
     WHERE nonce_id = %d",
     array($nonce->nonce_id));
 
+  watchdog('multifactor', var_export($result, TRUE));
+
   // Check if the nonce is more recent then the request itself.
   // @todo check if the nonce is younger then the maximum age.
   if($nonce->timestamp >= $start_time) {
@@ -216,7 +216,6 @@ function multifactor_user_login_validate($form, &$form_state) {
        *  block user1 and make no further calls on the users behalf.
        */
     }
-    sess_destroy_uid($user->uid);
     form_set_error('void', 'Multifactor Failure.', TRUE);
     return;
   }
@@ -263,11 +262,12 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     watchdog('multifactor', 'Invalid Params array passed to multifactor_voipscript_load_script');
   }
 
+  // @todo find out why the addSet at the top of the scripts get reset after getInput is called.
   if ($script_name === 'multifactor_get_pin') {
     $script = new VoipScript('multifactor_get_pin');
 
     // Setup basics
-    $script->addSet('uid', $params[1]);
+    //$script->addSet('uid', $params[1]);
 
     // Welcome script.
     $script->addLabel('welcome');
@@ -301,7 +301,7 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
     // Correct pin given message.
     $script->addLabel('success_message');
     $script->addSay('Thank you. I will log you in now.');
-    $script->addSet('nonce', '^_multifactor_finalize(%uid)');
+    $script->addSet('nonce', '^_multifactor_finalize('. $params[1] . ')');
     $script->addHangup();
     
     return $script;
@@ -318,7 +318,7 @@ function multifactor_voipscript_load_script($script_name, $params = NULL) {
  */
 // @todo this is probably not thread safe. We will need to pass something to the script to make sure it calls this
 // with enough information to check the correct pin number. UID makes sense I think for D6 and D7. 
-function _multifactor_validate_pin($pin = NULL) {
+/*function _multifactor_validate_pin($pin = NULL) {
   if (is_null($pin)) {
     watchdog('multifactor', 'Pin number is null.');
     return FALSE;
@@ -331,7 +331,7 @@ function _multifactor_validate_pin($pin = NULL) {
 
   watchdog('multifactor', 'Pin matches.');
   return TRUE;
-}
+}*/
 
 /**
  * Create a nonce/semaphore (not sure the correct term) for the authentication process.
