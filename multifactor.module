@@ -7,9 +7,16 @@
  * 
  */
 
-function multifactor_cron() {
+/**
+ * Implementation of hook_cron().
+ *
+ * @todo add a a field that indicates expire time.
+ *
+ * @return void
+ */
+function multifactor_voice_pin_cron() {
   watchdog('multifactor', 'Deleting stale nonces.');
-  db_query("DELETE FROM {multifactor_nonce} WHERE timestamp < %d", array(time() - 120));
+  db_query("DELETE FROM {multifactor_voice_pin_nonce} WHERE timestamp < %d", array(time() - 120));
 }
 
 /**
@@ -44,7 +51,15 @@ function multifactor_form_alter(&$form, $form_state, $form_id) {
 function multifactor_user_login_validate($form, &$form_state) {
   //love u
 
+  // @todo create a form for mapping multifactor options to roles.
+  // @todo allow a selection of which role can use which multifactor authentication type.
   // @todo Check which method the user prefers
+
+  // Call hook_multifactor_info(); Basically everyone that does multifactor implements this
+  foreach (module_implements('multifactor_info') as $module) {
+    $modules[] = $module;
+  }
+
   /*
    * switch(profile->multifactor_method) {
    *   case 'text': validate_text($form_state); break;
@@ -56,14 +71,6 @@ function multifactor_user_login_validate($form, &$form_state) {
   // Load user name from the form field - name.
   $name = $form_state['values']['name'];
 
-// @todo Move loading the user and profile into a separate helper function.
-//////////////////////////////////// LOAD USER
-  // Is the user blocked
-  // Fail silenty if the user is blocked.
-  if(user_is_blocked($name)) {
-    return;
-  }
-
   // Load the user.
   $user = user_load(array('name' => $name));
   // Fail silenty if the user doesn't exist.
@@ -71,280 +78,32 @@ function multifactor_user_login_validate($form, &$form_state) {
     return;
   }
 
-  // If the user only has the authenticated role and MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED is set to TRUE
-  // don't require multifactor authentication.
-  if((MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED)
-     && (count($user->roles) === 1)
-     && ($user->roles[0] === 'authenticated user')) {
-    watchdog('multifactor', 'Multifactor: multifactor_role_authenticated_user_disabled is set to TRUE. User has only
-            one role and it is the default authenticated user role');
+  /**
+   * @note This is a performance trade off and could be disabled safely with a variable_get or patch. I'll wait for the need
+   * to crop up before I add anything in here that might slow the process.
+   */
+  if(user_is_blocked($name)) {
+    // Fail silently and let the next non-multi-factor module have at it if the user is blocked.
     return;
   }
 
-  // @todo Load profile fields and check pre reqs required for multifactor authentication exits. (text = enabled || pin exists, etc.)
   // Load Profile Data
   profile_load_profile($user);
 
-  // @todo move getting a pin number to a support function in case the field changes or needs to be configurable.
-  // Brick the login process if failback isn't enabled or no pre-reqs exist. 
-  // @todo we might need to make this brick feature a bit more complex by only applying it to roles that require multifactor.
-  if(MULTIFACTOR_BRICK_ON_ERROR
-     && (!isset($user->profile_multifactor_pin) || !numeric($user->profile_multifactor_pin))) {
-    form_set_error('void', 'User doesn\'t have a pin in their profile.');
-    return;
+  // Call hook_multifactor_after_user_load($user, &$form_state) so that all other modules can run their checks.
+  module_invoke_all('multifactor_after_user_load', $user, &$form_state);
+
+  // Check if anyone set an error on the form during hook_multifactor_after_user_load($user, &$form_state).
+  $errors = form_get_errors();
+
+  if(!$errors) {
+    // Call hook_multifactor_validate($user, &$form_state). This is where the meat of most modules should be.
+    module_invoke_all('multifactor_validate', $user, &$form_state);
+    
+    // Check if anyone set an error on the form during hook_multifactor_validate($user, &$form_state).
+    $errors = form_get_errors();
   }
-
-  // Make sure a phone number exists.
-  if(MULTIFACTOR_BRICK_ON_ERROR
-     && (!isset($user->profile_multifactor_number) || !numeric($user->profile_multifactor_number))) {
-    form_set_error('void', 'User doesn\'t have a phone number in their profile.');
-    return;
-  }
-//////////////////////////////////// END LOAD USER
-
-
-//////////////////////////////////// LOAD ROLES TO CHECK
-  // Check if the user has any roles that have multi-factor enabled.
-  $multifactor_roles_to_check = variable_get('multifactor_roles_to_check', array('authenticated user',
-                                                                                'admin',
-                                                                                'administrator'));
-  if (!is_array($multifactor_roles_to_check)) {
-    watchdog('multifactor', 'Multifactor: multifactor_roles_to_check must be an array. Check to make sure this
-            variable isn\'t modified by strongarm, devel, or in a settings file, to something other then an array.
-            The array is valid even if it has only one element and follows the array syntax.');
-    // @todo if brick on errors fail here.
-    return;
-  }
-
-  // 3-way merge between checked roles, possible roles, and users actual roles.
-  $valid_roles = array_intersect($multifactor_roles_to_check,
-                                 user_roles(TRUE), // Exclude anonymous from list of all possible roles.
-                                 $user->roles // Actual user roles...no thanks to the above misnomer.
-  );
-
-  // If MULTIFACTOR_BRICK_ON_ERROR is set to TRUE then lock out the user because they could present a potential brute
-  // force vector. You might also want to use this in conjunction with MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED
-  // set to false which would mean all users will need to have multifactor authentication to login.
-  if(MULTIFACTOR_BRICK_ON_ERROR && count($valid_roles) === 0) {
-    form_set_error('void', 'User doesn\'t have roles included in multifactor authentication policies and has been
-                   blocked from login.');
-    return;
-  }
-//////////////////////////////////// END LOAD ROLES TO CHECK
-
-
-//////////////////////////////////// MAKE VOIP CALL
-
-  $start_time = time();
-
-  // Setup the initial call.
-  $call = new VoipCall();
-
-  // Get the correct script by it's node title and verify it is available - Requires scriptui.
-  $script = VoipScript::loadScript('multifactor_get_pin', array($user->profile_multifactor_pin, $user->uid));
-  $call->setScript($script);
-
-  // @todo Check number is valid as a pre-req.
-  $call->setDestNumber($user->profile_multifactor_number);
-  // @todo Verify this isn't needed.
-  $call->setDestName('Ben');
-
-  // The return from calling voip_dial will always be true as long as it contacts the service even if the service fails
-  // So After calling this we need to check the call status and verify the pin in the result. Only then is it successful.
-  $ret = voip_dial($call);
-  if (!$ret) {
-    watchdog('multifactor',
-      'Error queuing the call. Make sure the VOIP Drupal settings are correct and the VOIP Script exists and can be loaded.');
-    /*
-    if(MULTIFACTOR_BRICK_ON_ERROR) {
-      form_set_error('name', 'Multifactor Failure.');
-      return;
-    }
-    else {
-      return TRUE;
-    }
-    */
-  }
-
-  // Check for when the call is done so we can continue.
-  while(!$call->isHangup()) {
-    sleep(5); // Sleep one second and try again.
-    //watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
-
-    // Reload the call from the DB to make sure isHangup is accurate...
-    $call = VoipCall::load($call->getCid());
-
-    // Check Maximum execution time.
-    // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relavancy checks.
-    if (time() - $start_time > 60) {
-      watchdog('multifactor', 'Reached maximum execution time. Status: ' . var_export($call->getCallStatus(), TRUE));
-      break;
-    }
-  }
-  //$end_time = time();
-
-  // Once it's been hung up we check for a nonce/semaphore.
-  $result = db_query("
-    SELECT nonce_id, uid, timestamp, module
-    FROM {multifactor_nonce}
-    WHERE module = '%s' AND uid = '%d'",
-    array('multifactor_pin', $user->uid));
-  $nonce = db_fetch_object($result);
-
-  // Clean up the nonce immediately.
-  db_query("
-    DELETE FROM {multifactor_nonce}
-    WHERE nonce_id = %d",
-    array($nonce->nonce_id));
-
-  watchdog('multifactor', var_export($result, TRUE));
-
-  // Check if the nonce is more recent then the request itself.
-  // @todo check if the nonce is younger then the maximum age.
-  if($nonce->timestamp >= $start_time) {
-    return;
-  }
-  else {
-    // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
-    if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
-      /**
-       * @todo Implement User1 failover
-       * Call a backup admin and require a valid pin.
-       * If the second_admin_pin is correct
-       *   reset user 1's pin to a random 4 digit number and provide it to the second_admin
-       * If the second_admin_pin is incorrect
-       *  block user1 and make no further calls on the users behalf.
-       */
-    }
-    form_set_error('void', 'Multifactor Failure.', TRUE);
-    return;
-  }
-
   
-
-//////////////////////////////////// END MAKE VOIP CALL
-}
-
-/**
- * Call the user
- */
-
-/**
- * Setup the call
- */
-
-/**
- * Get profile data for the user.
- */
-
-/**
- * Hook into the profile fields to setup a pin number.
- */
-//user_profile_form($form_state, $account, $category = 'account')
-
-/**
- * Handle the profile form submit values to save the profile pin number
- */
-//user_profile_form_submit($form, &$form_state)
-
-/**
- * Provide a report that shows roles that won't be covered by multifactor.
- */
-
-
-function multifactor_voipscript_get_script_names() {
-  return array('multifactor_get_pin',);
-}
-
-function multifactor_voipscript_load_script($script_name, $params = NULL) {
-
-  if(!is_array($params)) {
-    watchdog('multifactor', 'Invalid Params array passed to multifactor_voipscript_load_script');
-  }
-
-  // @todo find out why the addSet at the top of the scripts get reset after getInput is called.
-  if ($script_name === 'multifactor_get_pin') {
-    $script = new VoipScript('multifactor_get_pin');
-
-    // Setup basics
-    //$script->addSet('uid', $params[1]);
-
-    // Welcome script.
-    $script->addLabel('welcome');
-    $script->addSay('Welcome to Multi Factor Authentication.');
-    $script->addGoto('get_pin');
-
-    // Get pin script.
-    $script->addLabel('get_pin');
-    $prompt = 'Please input your four digit pin number followed by the pound key.';
-    $script->addGetInput($prompt, 4, '#', 10);
-    $script->addSet('pin', '%input_digits');
-
-    // Check to make sure the input is somewhat valid.
-    $script->addGotoIf('invalid_pin', "^%input_digits == ''");
-    // Check if the pin matches the users pin
-    $script->addGotoIf('success_message', '^%input_digits === ' . (int)$params[0]);
-
-    // Validate the pin for real.
-    //$script->addSet('success', '^_multifactor_validate_pin(%pin)');
-    // Check for success because if we check for failure the success goto might accidentally get called.
-    //$script->addGotoIf('success_message', '^%success == TRUE');
-    
-    // Fail to failure notification if this isn't the correct pin.
-    $script->addGoto('invalid_pin');
-
-    // Invalid pin messages.
-    $script->addLabel('invalid_pin');
-    $script->addSay('Invalid Pin number please try again.');
-    $script->addGoto('get_pin');
-
-    // Correct pin given message.
-    $script->addLabel('success_message');
-    $script->addSay('Thank you. I will log you in now.');
-    $script->addSet('nonce', '^_multifactor_finalize('. $params[1] . ')');
-    $script->addHangup();
-    
-    return $script;
-  }
-}
-
-/**
- *
- * Deprecated: This isn't thread safe so I removed it from use. It might be needed later so it's still here.
- *
- * @param null $pin
- * @return bool
- *
- */
-// @todo this is probably not thread safe. We will need to pass something to the script to make sure it calls this
-// with enough information to check the correct pin number. UID makes sense I think for D6 and D7. 
-/*function _multifactor_validate_pin($pin = NULL) {
-  if (is_null($pin)) {
-    watchdog('multifactor', 'Pin number is null.');
-    return FALSE;
-  }
-
-  if ($pin != 1234) {
-    watchdog('multifactor', 'Invalid Pin. Input: @pin', array('@pin' => $pin), WATCHDOG_NOTICE);
-    return FALSE;
-  }
-
-  watchdog('multifactor', 'Pin matches.');
-  return TRUE;
-}*/
-
-/**
- * Create a nonce/semaphore (not sure the correct term) for the authentication process.
- * 
- * @param $uid
- * @return
- */
-function _multifactor_finalize($uid) {
-  // Insert into a table to create the nonce
-  db_query("
-    INSERT INTO {multifactor_nonce}
-      (uid, timestamp, module)
-    VALUES
-      (%d, %d, '%s')", array($uid, time(), 'multifactor_pin'));
-  return;
+  // Call hook_multifactor_finalize($user, $errors, &$form_state).
+  module_invoke_all('multifactor_finalize', $user, $errors, &$form_state);
 }

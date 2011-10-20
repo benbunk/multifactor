@@ -1,0 +1,261 @@
+<?php
+
+
+
+
+/**
+ * Implementation of hook_multifactor_info().
+ *
+ * @return string
+ */
+function multifactor_voice_pin_multifactor_info() {
+  return 'multifactor_voice_pin';
+}
+
+/**
+ * Implementation of hook_multifactor_after_user_load($user, &$form_state).
+ *
+ * @param $user
+ * @param $form_state
+ * @return void
+ */
+function multifactor_voice_pin_multifactor_after_user_load ($user, &$form_state) {
+  // We could form_set_error() here if we wanted to validate something in the user before continuing.
+  return;
+}
+
+/**
+ * Implementation of hook_multifactor_validate($user, &$form_state).
+ *
+ * @param $user
+ * @param $form_state
+ * @return 
+ */
+function multifactor_voice_pin_multifactor_validate($user, &$form_state) {
+  
+  // @todo move getting a pin number to a support function in case the field changes or needs to be configurable.
+  // Brick the login process if failback isn't enabled or no pre-reqs exist.
+  // @todo we might need to make this brick feature a bit more complex by only applying it to roles that require multifactor.
+  if(MULTIFACTOR_BRICK_ON_ERROR
+     && (!isset($user->profile_multifactor_pin) || !numeric($user->profile_multifactor_pin))) {
+    form_set_error('void', 'User doesn\'t have a pin in their profile.');
+    return;
+  }
+
+  // Make sure a phone number exists.
+  if(MULTIFACTOR_BRICK_ON_ERROR
+     && (!isset($user->profile_multifactor_number) || !numeric($user->profile_multifactor_number))) {
+    form_set_error('void', 'User doesn\'t have a phone number in their profile.');
+    return;
+  }
+
+  // Check if the user has any roles that have multi-factor enabled.
+  $multifactor_roles_to_check = variable_get('multifactor_roles_to_check', array('authenticated user',
+                                                                                'admin',
+                                                                                'administrator'));
+  if (!is_array($multifactor_roles_to_check)) {
+    watchdog('multifactor', 'Multifactor: multifactor_roles_to_check must be an array. Check to make sure this
+            variable isn\'t modified by strongarm, devel, or in a settings file, to something other then an array.
+            The array is valid even if it has only one element and follows the array syntax.');
+    // @todo if brick on errors fail here.
+    return;
+  }
+
+  // 3-way merge between checked roles, possible roles, and users actual roles.
+  $valid_roles = array_intersect($multifactor_roles_to_check,
+                                 user_roles(TRUE), // Exclude anonymous from list of all possible roles.
+                                 $user->roles // Actual user roles...no thanks to the above misnomer.
+  );
+
+  // If MULTIFACTOR_BRICK_ON_ERROR is set to TRUE then lock out the user because they could present a potential brute
+  // force vector. You might also want to use this in conjunction with MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED
+  // set to false which would mean all users will need to have multifactor authentication to login.
+  if(MULTIFACTOR_BRICK_ON_ERROR && count($valid_roles) === 0) {
+    form_set_error('void', 'User doesn\'t have roles included in multifactor authentication policies and has been
+                   blocked from login.');
+    return;
+  }
+
+  $start_time = time();
+
+  // Setup the initial call.
+  $call = new VoipCall();
+
+  // Get the correct script by it's node title and verify it is available - Requires scriptui.
+  $script = VoipScript::loadScript('multifactor_get_pin', array($user->profile_multifactor_pin, $user->uid));
+  $call->setScript($script);
+
+  // @todo Check number is valid as a pre-req.
+  $call->setDestNumber($user->profile_multifactor_number);
+  // @todo Verify this isn't needed.
+  $call->setDestName('Ben');
+
+  // The return from calling voip_dial will always be true as long as it contacts the service even if the service fails
+  // So After calling this we need to check the call status and verify the pin in the result. Only then is it successful.
+  $ret = voip_dial($call);
+  if (!$ret) {
+    watchdog('multifactor',
+      'Error queuing the call. Make sure the VOIP Drupal settings are correct and the VOIP Script exists and can be loaded.');
+    /*
+    if(MULTIFACTOR_BRICK_ON_ERROR) {
+      form_set_error('name', 'Multifactor Failure.');
+      return;
+    }
+    else {
+      return TRUE;
+    }
+    */
+  }
+
+  // Check for when the call is done so we can continue.
+  while(!$call->isHangup()) {
+    sleep(5); // Sleep one second and try again.
+    //watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
+
+    // Reload the call from the DB to make sure isHangup is accurate...
+    $call = VoipCall::load($call->getCid());
+
+    // Check Maximum execution time.
+    // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relavancy checks.
+    if (time() - $start_time > 60) {
+      watchdog('multifactor', 'Reached maximum execution time. Status: ' . var_export($call->getCallStatus(), TRUE));
+      break;
+    }
+  }
+  //$end_time = time();
+
+  // Once it's been hung up we check for a nonce/semaphore.
+  $result = db_query("
+    SELECT nonce_id, uid, timestamp, module
+    FROM {multifactor_nonce}
+    WHERE module = '%s' AND uid = '%d'",
+    array('multifactor_pin', $user->uid));
+  $nonce = db_fetch_object($result);
+
+  // Clean up the nonce immediately.
+  db_query("
+    DELETE FROM {multifactor_nonce}
+    WHERE nonce_id = %d",
+    array($nonce->nonce_id));
+
+  watchdog('multifactor', var_export($result, TRUE));
+
+  // Check if the nonce is more recent then the request itself.
+  // @todo check if the nonce is younger then the maximum age.
+  if($nonce->timestamp >= $start_time) {
+    return;
+  }
+  else {
+    // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
+    if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
+      /**
+       * @todo Implement User1 failover
+       * Call a backup admin and require a valid pin.
+       * If the second_admin_pin is correct
+       *   reset user 1's pin to a random 4 digit number and provide it to the second_admin
+       * If the second_admin_pin is incorrect
+       *  block user1 and make no further calls on the users behalf.
+       */
+    }
+    form_set_error('void', 'Multifactor Failure.', TRUE);
+    return;
+  }
+}
+
+/**
+ * Implementation of hook_voipscript_get_script_names().
+ * 
+ * @return array
+ */
+function multifactor_voice_pin_voipscript_get_script_names() {
+  return array('multifactor_get_pin',);
+}
+
+/**
+ * Implementation of hook_voipscript_load_script($script_name, $params = NULL).
+ *
+ * @param $script_name
+ * @param null $params
+ * @return VoipScript
+ */
+function multifactor_voice_pin_voipscript_load_script($script_name, $params = NULL) {
+
+  if(!is_array($params)) {
+    watchdog('multifactor', 'Invalid Params array passed to multifactor_voipscript_load_script');
+  }
+
+  // @todo find out why the addSet at the top of the scripts get reset after getInput is called.
+  if ($script_name === 'multifactor_get_pin') {
+    $script = new VoipScript('multifactor_get_pin');
+
+    // Setup basics
+    //$script->addSet('uid', $params[1]);
+
+    // Welcome script.
+    $script->addLabel('welcome');
+    $script->addSay('Welcome to Multi Factor Authentication.');
+    $script->addGoto('get_pin');
+
+    // Get pin script.
+    $script->addLabel('get_pin');
+    $prompt = 'Please input your four digit pin number followed by the pound key.';
+    $script->addGetInput($prompt, 4, '#', 10);
+    $script->addSet('pin', '%input_digits');
+
+    // Check to make sure the input is somewhat valid.
+    $script->addGotoIf('invalid_pin', "^%input_digits == ''");
+    // Check if the pin matches the users pin
+    $script->addGotoIf('success_message', '^%input_digits === ' . (int)$params[0]);
+
+    // Validate the pin for real.
+    //$script->addSet('success', '^_multifactor_validate_pin(%pin)');
+    // Check for success because if we check for failure the success goto might accidentally get called.
+    //$script->addGotoIf('success_message', '^%success == TRUE');
+
+    // Fail to failure notification if this isn't the correct pin.
+    $script->addGoto('invalid_pin');
+
+    // Invalid pin messages.
+    $script->addLabel('invalid_pin');
+    $script->addSay('Invalid Pin number please try again.');
+    $script->addGoto('get_pin');
+
+    // Correct pin given message.
+    $script->addLabel('success_message');
+    $script->addSay('Thank you. I will log you in now.');
+    $script->addSet('nonce', '^_multifactor_finalize('. $params[1] . ')');
+    $script->addHangup();
+
+    return $script;
+  }
+}
+
+/**
+ * Call back used in hook_voipscript_load_script($script_name, $params = NULL).
+ *
+ * Create a nonce/semaphore (not sure the correct term) for the authentication process.
+ *
+ * @param $uid
+ */
+function _multifactor_voice_pin_finalize($uid) {
+  // Insert into a table to create the nonce
+  db_query("
+    INSERT INTO {multifactor_nonce}
+      (uid, timestamp, module)
+    VALUES
+      (%d, %d, '%s')", array($uid, time(), 'multifactor_pin')
+  );
+}
+
+/**
+ * Implementation of hook_multifactor_finalize($user, $errors, &$form_state).
+ * 
+ * @param $user
+ * @param $errors
+ * @param $form_state
+ * @return void
+ */
+function multifactor_voice_call_multifactor_finalize($user, $errors, &$form_state) {
+  // meh not needed here.
+  return;
+}

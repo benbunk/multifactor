@@ -1,0 +1,5 @@
+name = Multi-Factor Voice Pin Authentication
+description = Voice based prompts to facilitate multi-factor pin authentication.
+core = 6.x
+
+dependencies[] = multifactor;
