@@ -14,13 +14,15 @@
  *
  * @return void
  */
-function multifactor_voice_pin_cron() {
+function multifactor_cron() {
   watchdog('multifactor', 'Deleting stale nonces.');
-  db_query("DELETE FROM {multifactor_voice_pin_nonce} WHERE timestamp < %d", array(time() - 120));
+  db_query("DELETE FROM {multifactor_nonce} WHERE timestamp < %d", array(time() - 120));
 }
 
 /**
  * Constants
+ *
+ * @todo This still needed? 
  */
 define('MULTIFACTOR_ROLE_AUTHENTICATED_USER_DISABLED',
   variable_get('multifactor_role_authenticated_user_disabled', TRUE));
@@ -51,6 +53,8 @@ function multifactor_form_alter(&$form, $form_state, $form_id) {
 function multifactor_user_login_validate($form, &$form_state) {
   //love u
 
+  static $modules;
+
   // @todo create a form for mapping multifactor options to roles.
   // @todo allow a selection of which role can use which multifactor authentication type.
   // @todo Check which method the user prefers
@@ -61,6 +65,7 @@ function multifactor_user_login_validate($form, &$form_state) {
   }
 
   /*
+   *
    * switch(profile->multifactor_method) {
    *   case 'text': validate_text($form_state); break;
    *   case 'voip': // Fall through...
@@ -84,6 +89,7 @@ function multifactor_user_login_validate($form, &$form_state) {
    */
   if(user_is_blocked($name)) {
     // Fail silently and let the next non-multi-factor module have at it if the user is blocked.
+    //@todo Should this be a form_set_error?
     return;
   }
 

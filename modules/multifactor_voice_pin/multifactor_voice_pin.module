@@ -1,6 +1,9 @@
 <?php
 
-
+/**
+ * @file
+ * 
+ */
 
 
 /**
@@ -81,7 +84,7 @@ function multifactor_voice_pin_multifactor_validate($user, &$form_state) {
   // Setup the initial call.
   $call = new VoipCall();
 
-  // Get the correct script by it's node title and verify it is available - Requires scriptui.
+  //@todo Get the correct script by it's node title and verify it is available - Requires scriptui.
   $script = VoipScript::loadScript('multifactor_get_pin', array($user->profile_multifactor_pin, $user->uid));
   $call->setScript($script);
 
@@ -109,57 +112,71 @@ function multifactor_voice_pin_multifactor_validate($user, &$form_state) {
 
   // Check for when the call is done so we can continue.
   while(!$call->isHangup()) {
-    sleep(5); // Sleep one second and try again.
+    sleep(5); // Sleep five second and try again.
     //watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
 
     // Reload the call from the DB to make sure isHangup is accurate...
     $call = VoipCall::load($call->getCid());
 
     // Check Maximum execution time.
-    // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relavancy checks.
+    // @todo use php.ini variables to set limit and make sure it doesn't exceed the nonce relevancy checks.
     if (time() - $start_time > 60) {
       watchdog('multifactor', 'Reached maximum execution time. Status: ' . var_export($call->getCallStatus(), TRUE));
       break;
     }
   }
-  //$end_time = time();
 
   // Once it's been hung up we check for a nonce/semaphore.
   $result = db_query("
     SELECT nonce_id, uid, timestamp, module
     FROM {multifactor_nonce}
     WHERE module = '%s' AND uid = '%d'",
-    array('multifactor_pin', $user->uid));
+    array('multifactor_voice_pin', $user->uid));
   $nonce = db_fetch_object($result);
 
   // Clean up the nonce immediately.
-  db_query("
-    DELETE FROM {multifactor_nonce}
-    WHERE nonce_id = %d",
-    array($nonce->nonce_id));
-
-  watchdog('multifactor', var_export($result, TRUE));
+  if (is_string($nonce->nonce_id)) {
+    db_query("
+      DELETE FROM {multifactor_nonce}
+      WHERE nonce_id = %d",
+      array($nonce->nonce_id));
+  }
 
   // Check if the nonce is more recent then the request itself.
   // @todo check if the nonce is younger then the maximum age.
-  if($nonce->timestamp >= $start_time) {
+  if(is_numeric($nonce->timestamp) && ($nonce->timestamp >= $start_time)) {
+    // Success!
     return;
   }
-  else {
-    // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
-    if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
-      /**
-       * @todo Implement User1 failover
-       * Call a backup admin and require a valid pin.
-       * If the second_admin_pin is correct
-       *   reset user 1's pin to a random 4 digit number and provide it to the second_admin
-       * If the second_admin_pin is incorrect
-       *  block user1 and make no further calls on the users behalf.
-       */
-    }
-    form_set_error('void', 'Multifactor Failure.', TRUE);
-    return;
+
+  // Special case for user 1 because this is the ultimate user and in some cases the only user with any power.
+  if(MULTIFACTOR_ROLE_USER_1_FAILOVER) {
+    /**
+     * @todo Implement User1 failover
+     * Call a backup admin and require a valid pin.
+     * If the second_admin_pin is correct
+     *   reset user 1's pin to a random 4 digit number and provide it to the second_admin
+     * If the second_admin_pin is incorrect
+     *  block user1 and make no further calls on the users behalf.
+     */
   }
+
+  // If you make it here the user failed to authenticate.
+  form_set_error('void', 'Multifactor Failure.', TRUE);
+  return;
+}
+
+/**
+ * Implementation of hook_multifactor_finalize($user, $errors, &$form_state).
+ *
+ * @param $user
+ * @param $errors
+ * @param $form_state
+ * @return void
+ */
+function multifactor_voice_call_multifactor_finalize($user, $errors, &$form_state) {
+  // Not needed for now.
+  return;
 }
 
 /**
@@ -181,7 +198,7 @@ function multifactor_voice_pin_voipscript_get_script_names() {
 function multifactor_voice_pin_voipscript_load_script($script_name, $params = NULL) {
 
   if(!is_array($params)) {
-    watchdog('multifactor', 'Invalid Params array passed to multifactor_voipscript_load_script');
+    watchdog('multifactor_voice_pin', 'Invalid Params array passed to multifactor_voipscript_load_script.');
   }
 
   // @todo find out why the addSet at the top of the scripts get reset after getInput is called.
@@ -193,12 +210,13 @@ function multifactor_voice_pin_voipscript_load_script($script_name, $params = NU
 
     // Welcome script.
     $script->addLabel('welcome');
-    $script->addSay('Welcome to Multi Factor Authentication.');
+    // Commenting this shaves time.
+    //$script->addSay('Welcome to Multi Factor Authentication.');
     $script->addGoto('get_pin');
 
     // Get pin script.
     $script->addLabel('get_pin');
-    $prompt = 'Please input your four digit pin number followed by the pound key.';
+    $prompt = 'Enter your pin number then the pound key.';
     $script->addGetInput($prompt, 4, '#', 10);
     $script->addSet('pin', '%input_digits');
 
@@ -235,6 +253,8 @@ function multifactor_voice_pin_voipscript_load_script($script_name, $params = NU
  *
  * Create a nonce/semaphore (not sure the correct term) for the authentication process.
  *
+ * This is required because it needs to happen before hook_multifactor_finalize.
+ *
  * @param $uid
  */
 function _multifactor_voice_pin_finalize($uid) {
@@ -243,19 +263,6 @@ function _multifactor_voice_pin_finalize($uid) {
     INSERT INTO {multifactor_nonce}
       (uid, timestamp, module)
     VALUES
-      (%d, %d, '%s')", array($uid, time(), 'multifactor_pin')
+      (%d, %d, '%s')", array($uid, time(), 'multifactor_voice_pin')
   );
-}
-
-/**
- * Implementation of hook_multifactor_finalize($user, $errors, &$form_state).
- * 
- * @param $user
- * @param $errors
- * @param $form_state
- * @return void
- */
-function multifactor_voice_call_multifactor_finalize($user, $errors, &$form_state) {
-  // meh not needed here.
-  return;
 }
