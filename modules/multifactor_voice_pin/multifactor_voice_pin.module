@@ -112,7 +112,7 @@ function multifactor_voice_pin_multifactor_validate($user, $form_state) {
 
   // Check for when the call is done so we can continue.
   while(!$call->isHangup()) {
-    sleep(5); // Sleep five second and try again.
+    sleep(2); // Sleep five second and try again.
     //watchdog('multifactor', 'Sleeping: ' . time() - $start_time);
 
     // Reload the call from the DB to make sure isHangup is accurate...
@@ -242,7 +242,7 @@ function multifactor_voice_pin_voipscript_load_script($script_name, $params = NU
     // Correct pin given message.
     $script->addLabel('success_message');
     $script->addSay('Thank you. I will log you in now.');
-    $script->addSet('nonce', '^_multifactor_finalize('. $params[1] . ')');
+    $script->addSet('nonce', '^_multifactor_voice_pin_finalize('. $params[1] . ')');
     $script->addHangup();
 
     return $script;
