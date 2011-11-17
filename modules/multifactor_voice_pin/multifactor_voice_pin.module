@@ -199,6 +199,7 @@ function multifactor_voice_pin_voipscript_load_script($script_name, $params = NU
 
   if(!is_array($params)) {
     watchdog('multifactor_voice_pin', 'Invalid Params array passed to multifactor_voipscript_load_script.');
+    return FALSE;
   }
 
   // @todo find out why the addSet at the top of the scripts get reset after getInput is called.
@@ -263,6 +264,5 @@ function _multifactor_voice_pin_finalize($uid) {
     INSERT INTO {multifactor_nonce}
       (uid, timestamp, module)
     VALUES
-      (%d, %d, '%s')", array($uid, time(), 'multifactor_voice_pin')
-  );
+      (%d, %d, '%s')", array($uid, time(), 'multifactor_voice_pin'));
 }
