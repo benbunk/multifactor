@@ -97,19 +97,19 @@ function multifactor_user_login_validate($form, &$form_state) {
   profile_load_profile($user);
 
   // Call hook_multifactor_after_user_load($user, &$form_state) so that all other modules can run their checks.
-  module_invoke_all('multifactor_after_user_load', $user, &$form_state);
+  module_invoke_all('multifactor_after_user_load', $user, $form_state);
 
   // Check if anyone set an error on the form during hook_multifactor_after_user_load($user, &$form_state).
   $errors = form_get_errors();
 
   if(!$errors) {
     // Call hook_multifactor_validate($user, &$form_state). This is where the meat of most modules should be.
-    module_invoke_all('multifactor_validate', $user, &$form_state);
+    module_invoke_all('multifactor_validate', $user, $form_state);
     
     // Check if anyone set an error on the form during hook_multifactor_validate($user, &$form_state).
     $errors = form_get_errors();
   }
   
   // Call hook_multifactor_finalize($user, $errors, &$form_state).
-  module_invoke_all('multifactor_finalize', $user, $errors, &$form_state);
+  module_invoke_all('multifactor_finalize', $user, $errors, $form_state);
 }
