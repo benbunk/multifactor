@@ -22,7 +22,7 @@ function multifactor_voice_pin_multifactor_info() {
  * @param $form_state
  * @return void
  */
-function multifactor_voice_pin_multifactor_after_user_load ($user, &$form_state) {
+function multifactor_voice_pin_multifactor_after_user_load ($user, $form_state) {
   // We could form_set_error() here if we wanted to validate something in the user before continuing.
   return;
 }
@@ -34,7 +34,7 @@ function multifactor_voice_pin_multifactor_after_user_load ($user, &$form_state)
  * @param $form_state
  * @return 
  */
-function multifactor_voice_pin_multifactor_validate($user, &$form_state) {
+function multifactor_voice_pin_multifactor_validate($user, $form_state) {
   
   // @todo move getting a pin number to a support function in case the field changes or needs to be configurable.
   // Brick the login process if failback isn't enabled or no pre-reqs exist.
@@ -174,7 +174,7 @@ function multifactor_voice_pin_multifactor_validate($user, &$form_state) {
  * @param $form_state
  * @return void
  */
-function multifactor_voice_call_multifactor_finalize($user, $errors, &$form_state) {
+function multifactor_voice_call_multifactor_finalize($user, $errors, $form_state) {
   // Not needed for now.
   return;
 }
